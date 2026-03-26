@@ -276,30 +276,30 @@ let videoData   = {};    // { 'p8-v1': 'ytId', ... }
 //   Left & right = full height videos
 
 const VIDEO_SLOTS = {
-  // ── PAGE 8: Ruxie ──────────────────────────────────────────────
+  // ── PAGE 7: Ruxie ──────────────────────────────────────────────
   // Replace the url: '' values below with your YouTube links
-  '8-v1': { top: 0.115, left: 0.361, width: 0.278, height: 0.370, url: '' },  // Ruxie — top centre
-  '8-v2': { top: 0.515, left: 0.064, width: 0.278, height: 0.370, url: '' },  // Ruxie — bottom left
-  '8-v3': { top: 0.515, left: 0.659, width: 0.277, height: 0.370, url: '' },  // Ruxie — bottom right
+  '7-v1': { top: 0.115, left: 0.361, width: 0.278, height: 0.370, url: '' },  // Ruxie — top centre
+  '7-v2': { top: 0.515, left: 0.064, width: 0.278, height: 0.370, url: '' },  // Ruxie — bottom left
+  '7-v3': { top: 0.515, left: 0.659, width: 0.277, height: 0.370, url: '' },  // Ruxie — bottom right
 
-  // ── PAGE 11: Commissioned Content ──────────────────────────────
+  // ── PAGE 10: Commissioned Content ──────────────────────────────
   // Replace the url: '' values below with your YouTube links
-  '11-v1': { top: 0.157, left: 0.048, width: 0.217, height: 0.686, url: '' }, // Commissioned — tall left
-  '11-v2': { top: 0.406, left: 0.280, width: 0.441, height: 0.437, url: '' }, // Commissioned — centre
-  '11-v3': { top: 0.157, left: 0.736, width: 0.217, height: 0.686, url: '' }, // Commissioned — tall right
+  '10-v1': { top: 0.157, left: 0.048, width: 0.217, height: 0.686, url: '' }, // Commissioned — tall left
+  '10-v2': { top: 0.406, left: 0.280, width: 0.441, height: 0.437, url: '' }, // Commissioned — centre
+  '10-v3': { top: 0.157, left: 0.736, width: 0.217, height: 0.686, url: '' }, // Commissioned — tall right
 };
 
 const SLOT_LABELS = {
-  '8-v1':  'Ruxie — Visualizer 1 (top centre)',
-  '8-v2':  'Ruxie — Visualizer 2 (bottom left)',
-  '8-v3':  'Ruxie — Visualizer 3 (bottom right)',
-  '11-v1': 'Commissioned — Video 1 (left)',
-  '11-v2': 'Commissioned — Video 2 (centre)',
-  '11-v3': 'Commissioned — Video 3 (right)',
+  '7-v1':  'Ruxie — Visualizer 1 (top centre)',
+  '7-v2':  'Ruxie — Visualizer 2 (bottom left)',
+  '7-v3':  'Ruxie — Visualizer 3 (bottom right)',
+  '10-v1': 'Commissioned — Video 1 (left)',
+  '10-v2': 'Commissioned — Video 2 (centre)',
+  '10-v3': 'Commissioned — Video 3 (right)',
 };
 
 // Which pages have video slots (1-indexed)
-const VIDEO_PAGES = new Set([8, 11]);
+const VIDEO_PAGES = new Set([7, 10]);
 
 // ─── YT ID EXTRACTOR ────────────────────────────────────────────
 function extractYTId(url) {
