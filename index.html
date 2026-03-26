@@ -373,9 +373,8 @@ function createOverlay(slotKey, displayW, displayH) {
 async function renderPage(pageNum) {
   const page = await pdfDoc.getPage(pageNum);
 
-  // Cap DPR on mobile — full 3x DPR makes canvases too large to scroll smoothly
-  const isMobile = window.innerWidth < 768;
-  const dpr = Math.min(window.devicePixelRatio || 1, isMobile ? 1.5 : 2);
+  // Cap DPR at 2 on all devices — good quality without excessive memory
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
   const vw  = document.documentElement.clientWidth;
   const baseViewport = page.getViewport({ scale: 1 });
   const fitScale = (vw / baseViewport.width) * dpr;
@@ -511,16 +510,6 @@ document.getElementById('file-input').addEventListener('change', async (e) => {
 // kick off
 autoLoadPDF();
 
-// handle window resize — re-render at new size
-let resizeTimer;
-window.addEventListener('resize', () => {
-  if (!pdfDoc) return;
-  clearTimeout(resizeTimer);
-  resizeTimer = setTimeout(async () => {
-    await renderAll();
-    setupScrollObserver();
-  }, 300);
-});
 </script>
 </body>
 </html>
