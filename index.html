@@ -60,6 +60,10 @@
     white-space: nowrap;
   }
 
+  @media (max-width: 767px) {
+    #nav-controls { display: none; }
+  }
+
   /* ── UPLOAD ZONE (shown before PDF is loaded) ── */
   #upload-zone {
     position: fixed;
@@ -109,7 +113,6 @@
     display: block;
     width: 100%;
     height: auto;
-    touch-action: pan-y;
   }
 
   /* separator between pages */
