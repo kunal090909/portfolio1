@@ -231,16 +231,13 @@
     <span id="page-info">— / —</span>
     <button id="btn-next" disabled onclick="changePage(1)">Next →</button>
   </div>
-  <label for="file-input" style="border:1px solid #444;color:#aaa;font-family:inherit;font-size:0.65rem;text-transform:uppercase;letter-spacing:0.1em;padding:0.22rem 0.8rem;cursor:pointer;">
-    Load PDF
-  </label>
-  <input type="file" id="file-input" accept=".pdf">
 </div>
 
-<!-- UPLOAD PROMPT -->
+<input type="file" id="file-input" accept=".pdf" style="display:none">
+
+<!-- UPLOAD PROMPT (fallback only) -->
 <div id="upload-zone">
-  <p>Load your portfolio PDF to begin</p>
-  <label for="file-input">Choose PDF</label>
+  <p>Loading portfolio…</p>
 </div>
 
 <!-- LOADING -->
@@ -258,67 +255,51 @@ pdfjsLib.GlobalWorkerOptions.workerSrc =
 let pdfDoc      = null;
 let totalPages  = 0;
 let currentPage = 1;
-let scale       = 1.6;   // render quality — bumped up for sharpness
+let scale       = 3.0;   // high-res render — crisp on retina/HD screens
 let pageWrappers = [];   // DOM nodes, one per page
 let videoData   = {};    // { 'p8-v1': 'ytId', ... }
 
 // ─── VIDEO SLOT DEFINITIONS ──────────────────────────────────────
-// Positions are expressed as fractions of the rendered page
-// (measured from the PDF images you shared).
+// Positions are fractions of the rendered canvas (width/height).
+// Measured from the actual PDF pages.
 //
-// PAGE 8  — Ruxie
-//   The page is a full-bleed bordered grid.
-//   Row 1: title(C1) | black-top(C2) | desc(C3)   ← top-centre is NOT a video
-//   Row 2: black(C1) | desc-text(C2) | black(C3)  ← bottom L, bottom R are videos
-//   BUT the user said: bottom-left, centre, bottom-right = 3 videos
-//   Re-examining PDF page 8: it's a 3×2 grid where the black squares are:
-//     top-centre (row1, col2), bottom-left (row2, col1), bottom-right (row2, col3)
-//   and the centre of row2 is text. So actually:
-//     video 1 = row1 col2  (top centre)  — wait, user said bottom-left, centre, bottom-right
-//   User explicitly said bottom-left, centre, bottom-right → all in row 2.
-//   Row 2 spans: col1=black, col2=text, col3=black  but user said "centre" is also video.
-//   So all three columns in row 2 have videos. The text block in centre of row2 is replaced by video.
+// PAGE 8 — Ruxie (landscape grid, 3 cols × 2 rows)
+//   Grid: left~2.5%, right~97.5%, top~7%, bottom~93%
+//   Col splits at ~35% and ~65% of page width
+//   Row split at ~50% of page height
+//   Videos: row1-col2 (top centre), row2-col1 (bottom left), row2-col3 (bottom right)
 //
-// Let me map pixel fractions from the PDF layout carefully:
-// The grid outer box starts ~3.8% from left, ends ~96.2% wide.
-// Row split is approximately 50/50 vertically within the grid area.
-// Grid starts at ~8% top, ends ~92% bottom of the page.
-// Col boundaries (within grid): 0% | 33.3% | 66.6% | 100%
-// Row 1 top-centre black square: row1, col2 — this is a video per PDF (black box)
-// But user said ONLY bottom row has 3 videos. So row1 col2 black = NOT a video.
-// Bottom row: col1 = black(vid), col2 = text, col3 = black(vid). That's only 2.
-// User said 3: bottom-left, CENTRE, bottom-right → col2 of row2 is also a video.
-// ─── So on page 8: row2-col1, row2-col2, row2-col3 all video. row1-col2 = image only.
+// PAGE 11 — Commissioned Content (landscape grid, 3 cols)
+//   Grid: left~3.5%, right~96.5%, top~12%, bottom~88%
+//   Col splits at ~31% and ~69%
+//   Centre col: top half = title+text, bottom half = video
+//   Left & right = full height videos
 
 const VIDEO_SLOTS = {
-  // key: 'page-slotId'
-  // value: { top, left, width, height } as fractions 0–1 of the page canvas size
+  // PAGE 8 — Ruxie
+  // row1-col2: top=7%, left=35%, width=30%, height=43%
+  '8-v1': { top: 0.070, left: 0.352, width: 0.296, height: 0.425 },  // top centre
+  // row2-col1: top=50%, left=2.5%, width=32.5%, height=43%
+  '8-v2': { top: 0.497, left: 0.025, width: 0.325, height: 0.433 },  // bottom left
+  // row2-col3: top=50%, left=65%, width=32.5%, height=43%
+  '8-v3': { top: 0.497, left: 0.650, width: 0.325, height: 0.433 },  // bottom right
 
-  // ── PAGE 8: Ruxie ──
-  // Outer grid box is roughly inset 2.5% each side, starts 7% from top, ends 92% from top.
-  // Grid is split into 2 rows (row1: ~7%–49.5%, row2: ~49.5%–92%) 
-  // 3 cols: col1: 2.5%–35.5%, col2: 35.5%–64.5%, col3: 64.5%–97.5%
-  '8-v1': { top: 0.495, left: 0.025, width: 0.330, height: 0.427 },  // row2 col1
-  '8-v2': { top: 0.495, left: 0.355, width: 0.290, height: 0.427 },  // row2 col2 (centre text→video)
-  '8-v3': { top: 0.495, left: 0.645, width: 0.330, height: 0.427 },  // row2 col3
-
-  // ── PAGE 11: Commissioned Content ──
-  // Outer grid: inset ~3.5% sides, ~12%–88% vertical.
-  // 3 cols: col1: 3.5%–31%, col2: 31%–69%, col3: 69%–96.5%
-  // Left & right are tall (full height of grid). Centre splits into top-text + bottom-video.
-  '11-v1': { top: 0.12,  left: 0.035, width: 0.275, height: 0.76  },  // tall left
-  '11-v2': { top: 0.50,  left: 0.310, width: 0.380, height: 0.38  },  // centre bottom
-  '11-v3': { top: 0.12,  left: 0.690, width: 0.275, height: 0.76  },  // tall right
+  // PAGE 11 — Commissioned Content
+  // tall left: top=12%, left=3.5%, width=27.5%, height=76%
+  '11-v1': { top: 0.120, left: 0.035, width: 0.275, height: 0.760 },
+  // centre bottom video: top=49%, left=31%, width=38%, height=39%
+  '11-v2': { top: 0.490, left: 0.310, width: 0.380, height: 0.390 },
+  // tall right: top=12%, left=69%, width=27.5%, height=76%
+  '11-v3': { top: 0.120, left: 0.690, width: 0.275, height: 0.760 },
 };
 
-// Map slot keys to human labels
 const SLOT_LABELS = {
-  '8-v1':  'Ruxie — Visualizer 1',
-  '8-v2':  'Ruxie — Visualizer 2',
-  '8-v3':  'Ruxie — Visualizer 3',
-  '11-v1': 'Commissioned — Video 1',
-  '11-v2': 'Commissioned — Video 2 (main)',
-  '11-v3': 'Commissioned — Video 3',
+  '8-v1':  'Ruxie — Visualizer 1 (top centre)',
+  '8-v2':  'Ruxie — Visualizer 2 (bottom left)',
+  '8-v3':  'Ruxie — Visualizer 3 (bottom right)',
+  '11-v1': 'Commissioned — Video 1 (left)',
+  '11-v2': 'Commissioned — Video 2 (centre)',
+  '11-v3': 'Commissioned — Video 3 (right)',
 };
 
 // Which pages have video slots (1-indexed)
@@ -438,27 +419,42 @@ function createOverlay(slotKey, canvasW, canvasH) {
 // ─── RENDER A SINGLE PAGE ───────────────────────────────────────
 async function renderPage(pageNum) {
   const page = await pdfDoc.getPage(pageNum);
-  const viewport = page.getViewport({ scale });
+
+  // Use devicePixelRatio for crisp rendering on retina/HD screens
+  const dpr = window.devicePixelRatio || 1;
+  const vw  = document.documentElement.clientWidth;
+  // compute scale so page fills viewport width at native resolution
+  const baseViewport = page.getViewport({ scale: 1 });
+  const fitScale = (vw / baseViewport.width) * dpr;
+  const viewport = page.getViewport({ scale: fitScale });
 
   const wrapper = document.createElement('div');
   wrapper.className = 'page-wrapper';
   wrapper.dataset.page = pageNum;
-  wrapper.style.width = viewport.width + 'px';
-  wrapper.style.maxWidth = '100%';
+  // display width = viewport width, height proportional
+  wrapper.style.width  = vw + 'px';
+  wrapper.style.height = (vw * baseViewport.height / baseViewport.width) + 'px';
 
   const canvas = document.createElement('canvas');
   canvas.width  = viewport.width;
   canvas.height = viewport.height;
+  // CSS size = display size (vw wide)
+  canvas.style.width  = '100%';
+  canvas.style.height = '100%';
 
   const ctx = canvas.getContext('2d');
   await page.render({ canvasContext: ctx, viewport }).promise;
 
   wrapper.appendChild(canvas);
 
+  // overlay positions use display (CSS) dimensions, not canvas pixel dims
+  const displayW = vw;
+  const displayH = vw * baseViewport.height / baseViewport.width;
+
   // add video overlays for this page
   const pageSlots = Object.keys(VIDEO_SLOTS).filter(k => k.startsWith(pageNum + '-'));
   pageSlots.forEach(slotKey => {
-    const ov = createOverlay(slotKey, viewport.width, viewport.height);
+    const ov = createOverlay(slotKey, displayW, displayH);
     wrapper.appendChild(ov);
   });
 
@@ -562,15 +558,12 @@ document.getElementById('file-input').addEventListener('change', async (e) => {
 // kick off
 autoLoadPDF();
 
-// handle window resize — re-render at new scale
+// handle window resize — re-render at new size
 let resizeTimer;
 window.addEventListener('resize', () => {
   if (!pdfDoc) return;
   clearTimeout(resizeTimer);
   resizeTimer = setTimeout(async () => {
-    // recalculate scale based on viewport
-    const vw = document.documentElement.clientWidth;
-    scale = Math.max(1.2, Math.min(2.4, vw / 500));
     await renderAll();
     setupScrollObserver();
   }, 300);
