@@ -276,21 +276,17 @@ let videoData   = {};    // { 'p8-v1': 'ytId', ... }
 //   Left & right = full height videos
 
 const VIDEO_SLOTS = {
-  // PAGE 8 — Ruxie
-  // row1-col2: top=7%, left=35%, width=30%, height=43%
-  '8-v1': { top: 0.070, left: 0.352, width: 0.296, height: 0.425 },  // top centre
-  // row2-col1: top=50%, left=2.5%, width=32.5%, height=43%
-  '8-v2': { top: 0.497, left: 0.025, width: 0.325, height: 0.433 },  // bottom left
-  // row2-col3: top=50%, left=65%, width=32.5%, height=43%
-  '8-v3': { top: 0.497, left: 0.650, width: 0.325, height: 0.433 },  // bottom right
+  // ── PAGE 8: Ruxie ──────────────────────────────────────────────
+  // Replace the url: '' values below with your YouTube links
+  '8-v1': { top: 0.070, left: 0.352, width: 0.296, height: 0.425, url: '' },  // Ruxie — top centre
+  '8-v2': { top: 0.497, left: 0.025, width: 0.325, height: 0.433, url: '' },  // Ruxie — bottom left
+  '8-v3': { top: 0.497, left: 0.650, width: 0.325, height: 0.433, url: '' },  // Ruxie — bottom right
 
-  // PAGE 11 — Commissioned Content
-  // tall left: top=12%, left=3.5%, width=27.5%, height=76%
-  '11-v1': { top: 0.120, left: 0.035, width: 0.275, height: 0.760 },
-  // centre bottom video: top=49%, left=31%, width=38%, height=39%
-  '11-v2': { top: 0.490, left: 0.310, width: 0.380, height: 0.390 },
-  // tall right: top=12%, left=69%, width=27.5%, height=76%
-  '11-v3': { top: 0.120, left: 0.690, width: 0.275, height: 0.760 },
+  // ── PAGE 11: Commissioned Content ──────────────────────────────
+  // Replace the url: '' values below with your YouTube links
+  '11-v1': { top: 0.120, left: 0.035, width: 0.275, height: 0.760, url: '' }, // Commissioned — tall left
+  '11-v2': { top: 0.490, left: 0.310, width: 0.380, height: 0.390, url: '' }, // Commissioned — centre
+  '11-v3': { top: 0.120, left: 0.690, width: 0.275, height: 0.760, url: '' }, // Commissioned — tall right
 };
 
 const SLOT_LABELS = {
@@ -343,75 +339,30 @@ function loadVideoSlot(slotKey, url) {
 }
 
 // ─── CREATE OVERLAY FOR A SLOT ──────────────────────────────────
-function createOverlay(slotKey, canvasW, canvasH) {
+function createOverlay(slotKey, displayW, displayH) {
   const s = VIDEO_SLOTS[slotKey];
   const div = document.createElement('div');
   div.className = 'vid-overlay';
   div.dataset.slot = slotKey;
 
-  const pw = canvasW * s.width;
-  const ph = canvasH * s.height;
-
-  // if very small, show compact clickable overlay
-  const compact = pw < 80 || ph < 60;
-  if (compact) div.classList.add('compact');
-
   div.style.cssText = `
-    left:   ${(canvasW * s.left).toFixed(1)}px;
-    top:    ${(canvasH * s.top).toFixed(1)}px;
-    width:  ${pw.toFixed(1)}px;
-    height: ${ph.toFixed(1)}px;
+    left:   ${(displayW * s.left).toFixed(1)}px;
+    top:    ${(displayH * s.top).toFixed(1)}px;
+    width:  ${(displayW * s.width).toFixed(1)}px;
+    height: ${(displayH * s.height).toFixed(1)}px;
   `;
 
-  // placeholder
-  const placeholder = document.createElement('div');
-  placeholder.className = 'placeholder';
-
-  const icon = document.createElement('div');
-  icon.className = 'icon';
-
-  const lbl = document.createElement('div');
-  lbl.className = 'lbl';
-  lbl.textContent = SLOT_LABELS[slotKey] || slotKey;
-
-  const inp = document.createElement('input');
-  inp.type = 'text';
-  inp.placeholder = 'Paste YouTube URL';
-
-  const btn = document.createElement('button');
-  btn.textContent = 'Load';
-  btn.onclick = () => {
-    const ok = loadVideoSlot(slotKey, inp.value);
-    if (!ok) {
-      inp.style.borderColor = 'rgba(255,80,80,0.7)';
-      setTimeout(() => inp.style.borderColor = '', 1500);
-    }
-  };
-
-  inp.addEventListener('keydown', e => {
-    if (e.key === 'Enter') btn.click();
-  });
-
-  placeholder.append(icon, lbl, inp, btn);
-  div.appendChild(placeholder);
-
-  // compact click → prompt
-  if (compact) {
-    div.addEventListener('click', () => {
-      const url = prompt(`YouTube URL for:\n${SLOT_LABELS[slotKey]}`);
-      if (url) loadVideoSlot(slotKey, url);
-    });
-  }
-
-  // if video already loaded (e.g. page re-render), inject iframe
-  if (videoData[slotKey]) {
-    placeholder.style.display = 'none';
+  // auto-load from hardcoded url
+  const ytId = extractYTId(s.url);
+  if (ytId) {
+    videoData[slotKey] = ytId;
     const iframe = document.createElement('iframe');
-    iframe.src = `https://www.youtube.com/embed/${videoData[slotKey]}?rel=0&modestbranding=1`;
+    iframe.src = `https://www.youtube.com/embed/${ytId}?rel=0&modestbranding=1`;
     iframe.allow = 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture';
     iframe.allowFullscreen = true;
     div.appendChild(iframe);
   }
+  // if no url set yet, overlay stays black (invisible to viewer — just covers the black box)
 
   return div;
 }
