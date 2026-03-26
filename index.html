@@ -1,0 +1,580 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Kunal's Portfolio</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: #1a1a1a;
+    font-family: 'Courier New', monospace;
+    min-height: 100vh;
+  }
+
+  /* ── TOP BAR ── */
+  #topbar {
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    z-index: 200;
+    background: #000;
+    border-bottom: 1px solid #333;
+    height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 1.2rem;
+    gap: 1rem;
+  }
+  #topbar .title {
+    color: #fff;
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.18em;
+    white-space: nowrap;
+  }
+  #nav-controls {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+  }
+  #nav-controls button {
+    background: transparent;
+    border: 1px solid #444;
+    color: #fff;
+    font-family: inherit;
+    font-size: 0.7rem;
+    padding: 0.25rem 0.7rem;
+    cursor: pointer;
+    letter-spacing: 0.08em;
+    transition: border-color 0.15s, background 0.15s;
+  }
+  #nav-controls button:hover { border-color: #aaa; background: #111; }
+  #nav-controls button:disabled { opacity: 0.3; cursor: default; }
+  #page-info {
+    color: #888;
+    font-size: 0.65rem;
+    letter-spacing: 0.1em;
+    white-space: nowrap;
+  }
+
+  /* ── UPLOAD ZONE (shown before PDF is loaded) ── */
+  #upload-zone {
+    position: fixed;
+    inset: 44px 0 0 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 1.2rem;
+    background: #111;
+  }
+  #upload-zone p {
+    color: #555;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.15em;
+  }
+  #upload-zone label {
+    border: 1px solid #444;
+    color: #ccc;
+    font-family: inherit;
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    padding: 0.5rem 1.4rem;
+    cursor: pointer;
+    transition: border-color 0.15s;
+  }
+  #upload-zone label:hover { border-color: #aaa; }
+  #file-input { display: none; }
+
+  /* ── VIEWER ── */
+  #viewer {
+    display: none;
+    padding-top: 44px;
+  }
+
+  /* Each page = relative container so overlays can be absolute inside */
+  .page-wrapper {
+    position: relative;
+    margin: 0 auto;
+    display: block;
+    /* width set by JS to match canvas */
+  }
+  .page-wrapper canvas {
+    display: block;
+    width: 100%;
+    height: auto;
+  }
+
+  /* separator between pages */
+  .page-sep {
+    height: 16px;
+    background: #1a1a1a;
+  }
+
+  /* ── VIDEO OVERLAY ── */
+  .vid-overlay {
+    position: absolute;
+    background: #000;
+    overflow: hidden;
+  }
+  .vid-overlay iframe {
+    width: 100%;
+    height: 100%;
+    display: block;
+    border: none;
+  }
+  /* placeholder shown until user pastes URL */
+  .vid-overlay .placeholder {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 8px;
+    background: #000;
+  }
+  .vid-overlay .placeholder .icon {
+    width: 36px; height: 36px;
+    border: 1.5px solid rgba(255,255,255,0.35);
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+  .vid-overlay .placeholder .icon::after {
+    content: '';
+    border-left: 12px solid #fff;
+    border-top: 7px solid transparent;
+    border-bottom: 7px solid transparent;
+    margin-left: 3px;
+  }
+  .vid-overlay .placeholder .lbl {
+    color: rgba(255,255,255,0.35);
+    font-size: 0.55rem;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    text-align: center;
+  }
+  .vid-overlay .placeholder input {
+    width: 88%;
+    background: transparent;
+    border: 1px solid rgba(255,255,255,0.2);
+    color: #fff;
+    font-family: 'Courier New', monospace;
+    font-size: 0.6rem;
+    padding: 3px 6px;
+    text-align: center;
+    outline: none;
+  }
+  .vid-overlay .placeholder input:focus { border-color: rgba(255,255,255,0.6); }
+  .vid-overlay .placeholder button {
+    background: transparent;
+    border: 1px solid rgba(255,255,255,0.3);
+    color: #fff;
+    font-family: 'Courier New', monospace;
+    font-size: 0.55rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    padding: 2px 10px;
+    cursor: pointer;
+  }
+  .vid-overlay .placeholder button:hover { background: rgba(255,255,255,0.08); }
+
+  /* hide placeholder inputs on tiny overlays */
+  .vid-overlay.compact .placeholder input,
+  .vid-overlay.compact .placeholder button {
+    display: none;
+  }
+  .vid-overlay.compact .placeholder .lbl { display: none; }
+  .vid-overlay.compact { cursor: pointer; }
+
+  /* loading spinner */
+  #loading {
+    display: none;
+    position: fixed;
+    inset: 44px 0 0 0;
+    background: #111;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    gap: 1rem;
+    color: #555;
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.15em;
+    z-index: 50;
+  }
+  #loading.active { display: flex; }
+  .spinner {
+    width: 28px; height: 28px;
+    border: 2px solid #333;
+    border-top-color: #888;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+</style>
+</head>
+<body>
+
+<!-- TOP BAR -->
+<div id="topbar">
+  <span class="title">Kunal's Portfolio</span>
+  <div id="nav-controls">
+    <button id="btn-prev" disabled onclick="changePage(-1)">← Prev</button>
+    <span id="page-info">— / —</span>
+    <button id="btn-next" disabled onclick="changePage(1)">Next →</button>
+  </div>
+  <label for="file-input" style="border:1px solid #444;color:#aaa;font-family:inherit;font-size:0.65rem;text-transform:uppercase;letter-spacing:0.1em;padding:0.22rem 0.8rem;cursor:pointer;">
+    Load PDF
+  </label>
+  <input type="file" id="file-input" accept=".pdf">
+</div>
+
+<!-- UPLOAD PROMPT -->
+<div id="upload-zone">
+  <p>Load your portfolio PDF to begin</p>
+  <label for="file-input">Choose PDF</label>
+</div>
+
+<!-- LOADING -->
+<div id="loading"><div class="spinner"></div><span>Rendering pages…</span></div>
+
+<!-- VIEWER -->
+<div id="viewer"></div>
+
+<script>
+// ─── PDF.js worker ───────────────────────────────────────────────
+pdfjsLib.GlobalWorkerOptions.workerSrc =
+  'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+// ─── STATE ───────────────────────────────────────────────────────
+let pdfDoc      = null;
+let totalPages  = 0;
+let currentPage = 1;
+let scale       = 1.6;   // render quality — bumped up for sharpness
+let pageWrappers = [];   // DOM nodes, one per page
+let videoData   = {};    // { 'p8-v1': 'ytId', ... }
+
+// ─── VIDEO SLOT DEFINITIONS ──────────────────────────────────────
+// Positions are expressed as fractions of the rendered page
+// (measured from the PDF images you shared).
+//
+// PAGE 8  — Ruxie
+//   The page is a full-bleed bordered grid.
+//   Row 1: title(C1) | black-top(C2) | desc(C3)   ← top-centre is NOT a video
+//   Row 2: black(C1) | desc-text(C2) | black(C3)  ← bottom L, bottom R are videos
+//   BUT the user said: bottom-left, centre, bottom-right = 3 videos
+//   Re-examining PDF page 8: it's a 3×2 grid where the black squares are:
+//     top-centre (row1, col2), bottom-left (row2, col1), bottom-right (row2, col3)
+//   and the centre of row2 is text. So actually:
+//     video 1 = row1 col2  (top centre)  — wait, user said bottom-left, centre, bottom-right
+//   User explicitly said bottom-left, centre, bottom-right → all in row 2.
+//   Row 2 spans: col1=black, col2=text, col3=black  but user said "centre" is also video.
+//   So all three columns in row 2 have videos. The text block in centre of row2 is replaced by video.
+//
+// Let me map pixel fractions from the PDF layout carefully:
+// The grid outer box starts ~3.8% from left, ends ~96.2% wide.
+// Row split is approximately 50/50 vertically within the grid area.
+// Grid starts at ~8% top, ends ~92% bottom of the page.
+// Col boundaries (within grid): 0% | 33.3% | 66.6% | 100%
+// Row 1 top-centre black square: row1, col2 — this is a video per PDF (black box)
+// But user said ONLY bottom row has 3 videos. So row1 col2 black = NOT a video.
+// Bottom row: col1 = black(vid), col2 = text, col3 = black(vid). That's only 2.
+// User said 3: bottom-left, CENTRE, bottom-right → col2 of row2 is also a video.
+// ─── So on page 8: row2-col1, row2-col2, row2-col3 all video. row1-col2 = image only.
+
+const VIDEO_SLOTS = {
+  // key: 'page-slotId'
+  // value: { top, left, width, height } as fractions 0–1 of the page canvas size
+
+  // ── PAGE 8: Ruxie ──
+  // Outer grid box is roughly inset 2.5% each side, starts 7% from top, ends 92% from top.
+  // Grid is split into 2 rows (row1: ~7%–49.5%, row2: ~49.5%–92%) 
+  // 3 cols: col1: 2.5%–35.5%, col2: 35.5%–64.5%, col3: 64.5%–97.5%
+  '8-v1': { top: 0.495, left: 0.025, width: 0.330, height: 0.427 },  // row2 col1
+  '8-v2': { top: 0.495, left: 0.355, width: 0.290, height: 0.427 },  // row2 col2 (centre text→video)
+  '8-v3': { top: 0.495, left: 0.645, width: 0.330, height: 0.427 },  // row2 col3
+
+  // ── PAGE 11: Commissioned Content ──
+  // Outer grid: inset ~3.5% sides, ~12%–88% vertical.
+  // 3 cols: col1: 3.5%–31%, col2: 31%–69%, col3: 69%–96.5%
+  // Left & right are tall (full height of grid). Centre splits into top-text + bottom-video.
+  '11-v1': { top: 0.12,  left: 0.035, width: 0.275, height: 0.76  },  // tall left
+  '11-v2': { top: 0.50,  left: 0.310, width: 0.380, height: 0.38  },  // centre bottom
+  '11-v3': { top: 0.12,  left: 0.690, width: 0.275, height: 0.76  },  // tall right
+};
+
+// Map slot keys to human labels
+const SLOT_LABELS = {
+  '8-v1':  'Ruxie — Visualizer 1',
+  '8-v2':  'Ruxie — Visualizer 2',
+  '8-v3':  'Ruxie — Visualizer 3',
+  '11-v1': 'Commissioned — Video 1',
+  '11-v2': 'Commissioned — Video 2 (main)',
+  '11-v3': 'Commissioned — Video 3',
+};
+
+// Which pages have video slots (1-indexed)
+const VIDEO_PAGES = new Set([8, 11]);
+
+// ─── YT ID EXTRACTOR ────────────────────────────────────────────
+function extractYTId(url) {
+  url = (url || '').trim();
+  let m;
+  m = url.match(/[?&]v=([a-zA-Z0-9_-]{11})/); if (m) return m[1];
+  m = url.match(/youtu\.be\/([a-zA-Z0-9_-]{11})/); if (m) return m[1];
+  m = url.match(/embed\/([a-zA-Z0-9_-]{11})/); if (m) return m[1];
+  m = url.match(/shorts\/([a-zA-Z0-9_-]{11})/); if (m) return m[1];
+  if (/^[a-zA-Z0-9_-]{11}$/.test(url)) return url;
+  return null;
+}
+
+// ─── LOAD VIDEO INTO SLOT ────────────────────────────────────────
+function loadVideoSlot(slotKey, url) {
+  const ytId = extractYTId(url);
+  if (!ytId) return false;
+  videoData[slotKey] = ytId;
+
+  // find the overlay div for this slot
+  const overlay = document.querySelector(`.vid-overlay[data-slot="${slotKey}"]`);
+  if (!overlay) return true;
+
+  const ph = overlay.querySelector('.placeholder');
+  ph.style.display = 'none';
+
+  // remove old iframe if any
+  const old = overlay.querySelector('iframe');
+  if (old) old.remove();
+
+  const iframe = document.createElement('iframe');
+  iframe.src = `https://www.youtube.com/embed/${ytId}?rel=0&modestbranding=1`;
+  iframe.allow = 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture';
+  iframe.allowFullscreen = true;
+  overlay.appendChild(iframe);
+  return true;
+}
+
+// ─── CREATE OVERLAY FOR A SLOT ──────────────────────────────────
+function createOverlay(slotKey, canvasW, canvasH) {
+  const s = VIDEO_SLOTS[slotKey];
+  const div = document.createElement('div');
+  div.className = 'vid-overlay';
+  div.dataset.slot = slotKey;
+
+  const pw = canvasW * s.width;
+  const ph = canvasH * s.height;
+
+  // if very small, show compact clickable overlay
+  const compact = pw < 80 || ph < 60;
+  if (compact) div.classList.add('compact');
+
+  div.style.cssText = `
+    left:   ${(canvasW * s.left).toFixed(1)}px;
+    top:    ${(canvasH * s.top).toFixed(1)}px;
+    width:  ${pw.toFixed(1)}px;
+    height: ${ph.toFixed(1)}px;
+  `;
+
+  // placeholder
+  const placeholder = document.createElement('div');
+  placeholder.className = 'placeholder';
+
+  const icon = document.createElement('div');
+  icon.className = 'icon';
+
+  const lbl = document.createElement('div');
+  lbl.className = 'lbl';
+  lbl.textContent = SLOT_LABELS[slotKey] || slotKey;
+
+  const inp = document.createElement('input');
+  inp.type = 'text';
+  inp.placeholder = 'Paste YouTube URL';
+
+  const btn = document.createElement('button');
+  btn.textContent = 'Load';
+  btn.onclick = () => {
+    const ok = loadVideoSlot(slotKey, inp.value);
+    if (!ok) {
+      inp.style.borderColor = 'rgba(255,80,80,0.7)';
+      setTimeout(() => inp.style.borderColor = '', 1500);
+    }
+  };
+
+  inp.addEventListener('keydown', e => {
+    if (e.key === 'Enter') btn.click();
+  });
+
+  placeholder.append(icon, lbl, inp, btn);
+  div.appendChild(placeholder);
+
+  // compact click → prompt
+  if (compact) {
+    div.addEventListener('click', () => {
+      const url = prompt(`YouTube URL for:\n${SLOT_LABELS[slotKey]}`);
+      if (url) loadVideoSlot(slotKey, url);
+    });
+  }
+
+  // if video already loaded (e.g. page re-render), inject iframe
+  if (videoData[slotKey]) {
+    placeholder.style.display = 'none';
+    const iframe = document.createElement('iframe');
+    iframe.src = `https://www.youtube.com/embed/${videoData[slotKey]}?rel=0&modestbranding=1`;
+    iframe.allow = 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture';
+    iframe.allowFullscreen = true;
+    div.appendChild(iframe);
+  }
+
+  return div;
+}
+
+// ─── RENDER A SINGLE PAGE ───────────────────────────────────────
+async function renderPage(pageNum) {
+  const page = await pdfDoc.getPage(pageNum);
+  const viewport = page.getViewport({ scale });
+
+  const wrapper = document.createElement('div');
+  wrapper.className = 'page-wrapper';
+  wrapper.dataset.page = pageNum;
+  wrapper.style.width = viewport.width + 'px';
+  wrapper.style.maxWidth = '100%';
+
+  const canvas = document.createElement('canvas');
+  canvas.width  = viewport.width;
+  canvas.height = viewport.height;
+
+  const ctx = canvas.getContext('2d');
+  await page.render({ canvasContext: ctx, viewport }).promise;
+
+  wrapper.appendChild(canvas);
+
+  // add video overlays for this page
+  const pageSlots = Object.keys(VIDEO_SLOTS).filter(k => k.startsWith(pageNum + '-'));
+  pageSlots.forEach(slotKey => {
+    const ov = createOverlay(slotKey, viewport.width, viewport.height);
+    wrapper.appendChild(ov);
+  });
+
+  return wrapper;
+}
+
+// ─── RENDER ALL PAGES ───────────────────────────────────────────
+async function renderAll() {
+  const viewer = document.getElementById('viewer');
+  viewer.innerHTML = '';
+  pageWrappers = [];
+
+  for (let i = 1; i <= totalPages; i++) {
+    const wrapper = await renderPage(i);
+    viewer.appendChild(wrapper);
+    pageWrappers.push(wrapper);
+
+    if (i < totalPages) {
+      const sep = document.createElement('div');
+      sep.className = 'page-sep';
+      viewer.appendChild(sep);
+    }
+  }
+}
+
+// ─── PAGE NAVIGATION (scrolls to page) ──────────────────────────
+function changePage(delta) {
+  const next = currentPage + delta;
+  if (next < 1 || next > totalPages) return;
+  currentPage = next;
+  updateNav();
+  pageWrappers[currentPage - 1]?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function updateNav() {
+  document.getElementById('page-info').textContent = `${currentPage} / ${totalPages}`;
+  document.getElementById('btn-prev').disabled = currentPage <= 1;
+  document.getElementById('btn-next').disabled = currentPage >= totalPages;
+}
+
+// track current page via IntersectionObserver
+function setupScrollObserver() {
+  const io = new IntersectionObserver(entries => {
+    entries.forEach(e => {
+      if (e.isIntersecting) {
+        currentPage = parseInt(e.target.dataset.page);
+        updateNav();
+      }
+    });
+  }, { threshold: 0.4 });
+
+  pageWrappers.forEach(w => io.observe(w));
+}
+
+// ─── SHARED INIT AFTER PDF IS READY ─────────────────────────────
+async function initViewer() {
+  totalPages = pdfDoc.numPages;
+  await renderAll();
+  document.getElementById('loading').classList.remove('active');
+  document.getElementById('viewer').style.display = 'block';
+  document.getElementById('btn-prev').disabled = false;
+  document.getElementById('btn-next').disabled = false;
+  updateNav();
+  setupScrollObserver();
+  window.scrollTo(0, 0);
+}
+
+// ─── AUTO-LOAD PDF FROM SAME FOLDER ─────────────────────────────
+const PDF_FILENAME = 'portfolionovideo.pdf';
+
+async function autoLoadPDF() {
+  try {
+    document.getElementById('upload-zone').style.display = 'none';
+    document.getElementById('loading').classList.add('active');
+    document.getElementById('viewer').style.display = 'none';
+
+    pdfDoc = await pdfjsLib.getDocument(PDF_FILENAME).promise;
+    await initViewer();
+  } catch (err) {
+    // PDF not found (e.g. local file:// open without server) — show upload fallback
+    document.getElementById('loading').classList.remove('active');
+    document.getElementById('upload-zone').style.display = 'flex';
+    console.warn('Auto-load failed, falling back to file picker.', err);
+  }
+}
+
+// ─── FALLBACK: manual file pick ─────────────────────────────────
+document.getElementById('file-input').addEventListener('change', async (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+
+  document.getElementById('upload-zone').style.display = 'none';
+  document.getElementById('loading').classList.add('active');
+  document.getElementById('viewer').style.display = 'none';
+
+  const arrayBuffer = await file.arrayBuffer();
+  pdfDoc = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+  await initViewer();
+});
+
+// kick off
+autoLoadPDF();
+
+// handle window resize — re-render at new scale
+let resizeTimer;
+window.addEventListener('resize', () => {
+  if (!pdfDoc) return;
+  clearTimeout(resizeTimer);
+  resizeTimer = setTimeout(async () => {
+    // recalculate scale based on viewport
+    const vw = document.documentElement.clientWidth;
+    scale = Math.max(1.2, Math.min(2.4, vw / 500));
+    await renderAll();
+    setupScrollObserver();
+  }, 300);
+});
+</script>
+</body>
+</html>
