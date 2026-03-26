@@ -95,6 +95,7 @@
   #viewer {
     display: none;
     padding-top: 44px;
+    -webkit-overflow-scrolling: touch;
   }
 
   /* Each page = relative container so overlays can be absolute inside */
@@ -102,12 +103,13 @@
     position: relative;
     margin: 0 auto;
     display: block;
-    /* width set by JS to match canvas */
+    will-change: transform;
   }
   .page-wrapper canvas {
     display: block;
     width: 100%;
     height: auto;
+    touch-action: pan-y;
   }
 
   /* separator between pages */
@@ -371,10 +373,10 @@ function createOverlay(slotKey, displayW, displayH) {
 async function renderPage(pageNum) {
   const page = await pdfDoc.getPage(pageNum);
 
-  // Use devicePixelRatio for crisp rendering on retina/HD screens
-  const dpr = window.devicePixelRatio || 1;
+  // Cap DPR on mobile — full 3x DPR makes canvases too large to scroll smoothly
+  const isMobile = window.innerWidth < 768;
+  const dpr = Math.min(window.devicePixelRatio || 1, isMobile ? 1.5 : 2);
   const vw  = document.documentElement.clientWidth;
-  // compute scale so page fills viewport width at native resolution
   const baseViewport = page.getViewport({ scale: 1 });
   const fitScale = (vw / baseViewport.width) * dpr;
   const viewport = page.getViewport({ scale: fitScale });
