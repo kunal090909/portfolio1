@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes, minimum-scale=1.0, maximum-scale=5.0">
 <title>Kunal's Portfolio</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <style>
@@ -373,8 +373,8 @@ function createOverlay(slotKey, displayW, displayH) {
 async function renderPage(pageNum) {
   const page = await pdfDoc.getPage(pageNum);
 
-  // Cap DPR at 2 on all devices — good quality without excessive memory
-  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  // 3x render for sharp quality — pinch zoom handled natively by browser
+  const dpr = Math.min(window.devicePixelRatio || 1, 3);
   const vw  = document.documentElement.clientWidth;
   const baseViewport = page.getViewport({ scale: 1 });
   const fitScale = (vw / baseViewport.width) * dpr;
